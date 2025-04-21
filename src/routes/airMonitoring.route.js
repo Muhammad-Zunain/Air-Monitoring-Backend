@@ -1,12 +1,16 @@
-
-import { getAllAirData, addAirData } from '../controllers/airMonitoringData.controller.js';
-import { Router } from 'express';
-
+import {
+  getAllAirData,
+  addAirData,
+  getAirDataStats,
+  getMonthlyAveragesController,
+} from "../controllers/airMonitoringData.controller.js";
+import { Router } from "express";
 
 const airMonitoringRouter = Router();
 
-airMonitoringRouter.get('/get-air-data', getAllAirData);
-// airMonitoringRouter.get('/filter', filterAirData);
-airMonitoringRouter.post('/add-air-data', addAirData);
+airMonitoringRouter.post("/add-air-data", addAirData);
+airMonitoringRouter.get("/get-monthly-averages", getMonthlyAveragesController);
+airMonitoringRouter.get("/get-air-data", getAllAirData);
+airMonitoringRouter.get("/get-stat-data", getAirDataStats);
 
 export default airMonitoringRouter;
