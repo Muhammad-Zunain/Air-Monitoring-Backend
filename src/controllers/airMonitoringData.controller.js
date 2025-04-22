@@ -6,7 +6,7 @@ import { AirData } from "../models/airMonitoring.model.js";
 // @route   GET /api/air-monitoring/get-air-data
 // @access  Public
 const getAllAirData = asyncHandler(async (req, res) => {
-  const airData = await AirData.find({}).sort({ timestamp: -1 });
+  const airData = await AirData.find({}).sort({ timestamp: -1 }).limit(1000);
   if (!airData) {
     return res
       .status(404)
@@ -95,7 +95,8 @@ const getMonthlyAveragesController = asyncHandler(async (req, res) => {
 // @route   GET /api/air-monitoring/get-stat-data
 // @access  Public
 const getAirDataStats = asyncHandler(async (req, res) => {
-  const airData = await AirData.find();
+  const airData = await AirData.find().limit(1000).sort({ timestamp: -1 });
+  console.log("okkk", airData);
 
   if (airData.length === 0) return res.status(404).json(new ApiResponse(404, {}, "No data" ));
 
@@ -113,33 +114,33 @@ const getAirDataStats = asyncHandler(async (req, res) => {
 
     const prev = values[values.length - 2] || current;
 
-    return {
-      current: {
+    return [
+       {
         title: `Current ${type}`,
         value: current,
         increase: getIncrease(current, prev),
         description: `Since last record`,
         icon: type
       },
-      highest: {
+       {
         title: `Highest ${type} Today`,
         value: highest,
         increase: getIncrease(highest, current),
         description: `Since last record`,
         icon: "up",
       },
-      lowest: {
+       {
         title: `Lowest ${type} Today`,
         value: lowest,
         increase: getIncrease(lowest, current),
         description: `Since last record`,
         icon: "down",
       },
-    };
+    ];
   };
 
   res.status(201).json(
-    ApiResponse(
+    new ApiResponse(
       201,
       {
         temperature: buildStats("temperature"),
