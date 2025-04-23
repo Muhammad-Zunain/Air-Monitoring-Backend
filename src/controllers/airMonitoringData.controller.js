@@ -6,17 +6,30 @@ import { AirData } from "../models/airMonitoring.model.js";
 // @route   GET /api/air-monitoring/get-air-data
 // @access  Public
 const getAllAirData = asyncHandler(async (req, res) => {
-  const airData = await AirData.find({}).sort({ timestamp: -1 }).limit(1000);
-  if (!airData) {
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    const airData = await AirData.find({
+      timestamp: { $gte: new Date('2024-12-31T00:00:00.000Z') }
+    })
+      .sort({ timestamp: -1 })
+      .limit(1000)
+      .setOptions({ allowDiskUse: true }); 
+
+    if (!airData || airData.length === 0) {
+      
+    console.log("No data found");
+      return res
+        .status(404)
+        .json(new ApiResponse(404, null, "No data found for the last 24 hours"));
+    }
+
     return res
-      .status(404)
-      .json(new ApiResponse(404, null, "Error occurred while fetching data "));
-  }
-  return res
-    .status(201)
-    .json(
-      new ApiResponse(200, airData, "Air Monitoring data fetched successfully")
-    );
+      .status(200)
+      .json(
+        new ApiResponse(200, airData, "Air Monitoring data from last 24 hours fetched successfully")
+      );
+  
 });
 
 // @desc    Add air monitoring data
@@ -46,27 +59,26 @@ const addAirData = asyncHandler(async (req, res) => {
 // @desc    Get monthly averages of air monitoring data
 // @route   GET /api/air-monitoring/get-monthly-averages
 // @access  Public
-const getMonthlyAveragesController = asyncHandler(async (req, res) => {
+const getMonthlyAverages = asyncHandler(async (req, res) => {
   const { year, type } = req.query;
-
   if (!year || !type) {
     return res.status(400).json({ error: "Year and type are required." });
   }
 
   const start = new Date(`${year}-01-01T00:00:00Z`);
   const end = new Date(`${parseInt(year) + 1}-01-01T00:00:00Z`);
-
+  console.log("Start:", start);
   const entries = await AirData.find({
     timestamp: { $gte: start, $lt: end },
-  });
-
+  }).limit(530000)
+  .setOptions({ allowDiskUse: true }); 
+  console.log("Entries:", entries.length);
   const monthlySums = Array(12).fill(0);
   const monthlyCounts = Array(12).fill(0);
 
   entries.forEach((entry) => {
     const date = new Date(entry.timestamp);
     const monthIndex = date.getMonth();
-
     const value = parseFloat(entry[type]);
     if (!isNaN(value)) {
       monthlySums[monthIndex] += value;
@@ -74,31 +86,47 @@ const getMonthlyAveragesController = asyncHandler(async (req, res) => {
     }
   });
 
-  const monthlyAverages = monthlySums.map((sum, index) =>
-    monthlyCounts[index] > 0
-      ? parseFloat((sum / monthlyCounts[index]).toFixed(2))
-      : 0
-  );
+  const allMonths = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
 
-  res
-    .status(201)
-    .json(
-      ApiResponse(
-        201,
-        { year, type, monthlyAverages },
-        "Monthly averages fetched successfully"
-      )
-    );
+  const monthlyAverages = monthlySums.map((sum, index) => {
+    const avg = monthlyCounts[index] > 0
+      ? parseFloat((sum / monthlyCounts[index]).toFixed(2))
+      : 0;
+    return {
+      month: allMonths[index],
+      [type]: avg
+    };
+  });
+  console.log(monthlyAverages);
+  res.status(201).json(
+    new ApiResponse(
+      201,
+      { monthlyAverages },
+      "Monthly averages fetched successfully"
+    )
+  );
 });
+
 
 // @desc    Get air data stats
 // @route   GET /api/air-monitoring/get-stat-data
 // @access  Public
 const getAirDataStats = asyncHandler(async (req, res) => {
-  const airData = await AirData.find().limit(1000).sort({ timestamp: -1 });
-  console.log("okkk", airData);
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const airData = await AirData.find({
+    timestamp: { $gte: new Date('2024-12-31T00:00:00.000Z') }
+  })
+    .sort({ timestamp: -1 })
+    .limit(1000)
+    .setOptions({ allowDiskUse: true });
 
-  if (airData.length === 0) return res.status(404).json(new ApiResponse(404, {}, "No data" ));
+  if (airData.length === 0) {
+    console.log("No datastat found");
+    return res.status(404).json(new ApiResponse(404, {}, "No data"));
+  }
 
   const buildStats = (type) => {
     const values = airData.map((entry) => parseFloat(entry[type]));
@@ -115,25 +143,25 @@ const getAirDataStats = asyncHandler(async (req, res) => {
     const prev = values[values.length - 2] || current;
 
     return [
-       {
+      {
         title: `Current ${type}`,
         value: current,
         increase: getIncrease(current, prev),
-        description: `Since last record`,
-        icon: type
+        description: `from last 24 hours"`,
+        icon: type,
       },
-       {
+      {
         title: `Highest ${type} Today`,
         value: highest,
         increase: getIncrease(highest, current),
-        description: `Since last record`,
+        description: `from last 24 hours"`,
         icon: "up",
       },
-       {
+      {
         title: `Lowest ${type} Today`,
         value: lowest,
         increase: getIncrease(lowest, current),
-        description: `Since last record`,
+        description: `from last 24 hours"`,
         icon: "down",
       },
     ];
@@ -147,14 +175,39 @@ const getAirDataStats = asyncHandler(async (req, res) => {
         humidity: buildStats("humidity"),
         dust: buildStats("dust"),
       },
-      ""
+      "Stats from last 24 hours"
     )
   );
 });
 
+const getLastHourAirData = asyncHandler(async (req, res) => {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+  try {
+    const airData = await AirData.find({
+      timestamp: { $gte: oneHourAgo }
+    })
+      .sort({ timestamp: -1 })
+      .limit(1000);
+
+    if (airData.length === 0) {
+      return res.status(404).json(new ApiResponse(404, {}, "No data found in the last hour"));
+    }
+
+    res.status(200).json(
+      new ApiResponse(200, airData, "Air data from the last hour")
+    );
+  } catch (error) {
+    console.error("Error fetching last hour data:", error);
+    res.status(500).json(new ApiResponse(500, {}, "Server Error"));
+  }
+});
+
+
 export {
   getAllAirData,
   addAirData,
-  getMonthlyAveragesController,
+  getMonthlyAverages,
   getAirDataStats,
+  getLastHourAirData,
 };
