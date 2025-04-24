@@ -1,6 +1,8 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { AirData } from "../models/airMonitoring.model.js";
+import { SensorLocation } from "../models/sensorLocation.model.js";
+import { console } from "inspector";
 
 // @desc    Get all air monitoring data
 // @route   GET /api/air-monitoring/get-air-data
@@ -203,6 +205,54 @@ const getLastHourAirData = asyncHandler(async (req, res) => {
   }
 });
 
+const saveSensorLocation = asyncHandler(async (req, res) => {
+  const { country, city, regionName, lon, lat } = req.body;
+  console.log(req.body);
+  if (!country || !city || !regionName || !lon || !lat) {
+    return res
+      .status(400)
+      .json(new ApiResponse(400, null, "Please provide all required fields"));
+  }
+
+  const sensorLocationData = {
+    country,
+    city,
+    regionName,
+    lon,
+    lat
+  };
+
+  const sensorLocation = await SensorLocation(sensorLocationData);
+  await sensorLocation.save();
+  if (!sensorLocation) {
+    return res
+      .status(500)
+      .json(new ApiResponse(500, null, "Error occurred while saving data"));
+  }
+
+  // delete the previous location stored
+  await SensorLocation.deleteMany({ _id: { $ne: sensorLocation._id } });
+
+  res
+    .status(201)
+    .json(
+      new ApiResponse(201, sensorLocation, "Sensor location added successfully")
+    );
+});
+
+// I want to allow the user to post a .bin file which will be stored in the temp folder
+
+const uploadBinFile = (req, res) => {
+  const { file } = req;
+  console.log(req)
+
+  if (!file) {
+    return res.status(400).json(new ApiResponse(400, null, 'No file uploaded'));
+  }
+
+  res.status(201).json(new ApiResponse(201, {}, 'File uploaded successfully'));
+};
+
 
 export {
   getAllAirData,
@@ -210,4 +260,6 @@ export {
   getMonthlyAverages,
   getAirDataStats,
   getLastHourAirData,
+  saveSensorLocation,
+  uploadBinFile
 };
