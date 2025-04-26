@@ -11,7 +11,7 @@ const port = process.env.PORT || 3000;
 
 connection()
   .then(() => {
-    app.listen(port, () => {
+    app.listen(port, "192.168.1.7",() => {
       console.log(`Server running at ${port}`);
     });
   })

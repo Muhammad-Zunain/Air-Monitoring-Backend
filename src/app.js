@@ -18,7 +18,6 @@ app.use(express.urlencoded({
 }))
 app.use(express.static("public"))
 
-
 //Routes
 import airMonitoringRouter from './routes/airMonitoring.route.js'
 

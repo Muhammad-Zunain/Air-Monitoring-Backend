@@ -3,6 +3,9 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { AirData } from "../models/airMonitoring.model.js";
 import { SensorLocation } from "../models/sensorLocation.model.js";
 import { console } from "inspector";
+import path from "path";
+import fs from "fs";
+
 
 // @desc    Get all air monitoring data
 // @route   GET /api/air-monitoring/get-air-data
@@ -240,18 +243,66 @@ const saveSensorLocation = asyncHandler(async (req, res) => {
     );
 });
 
-// I want to allow the user to post a .bin file which will be stored in the temp folder
+
 
 const uploadBinFile = (req, res) => {
   const { file } = req;
-  console.log(req)
 
   if (!file) {
     return res.status(400).json(new ApiResponse(400, null, 'No file uploaded'));
   }
 
-  res.status(201).json(new ApiResponse(201, {}, 'File uploaded successfully'));
+  return res.status(201).json(new ApiResponse(201, {}, 'File uploaded successfully'));
 };
+
+const getBinFileURL = (req, res) => {
+  const uploadDir = path.join(process.cwd(), 'public', 'temp');
+
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      return res.status(500).json({ message: 'Failed to read upload directory' });
+    }
+    
+    const firmwareFile = files.filter((f) => f.endsWith('.bin'))[0];
+
+    if (firmwareFile) {
+      const encodedFilename = encodeURIComponent(firmwareFile);
+      const firmwareUrl = `${req.protocol}://${req.get('host')}/temp/${encodedFilename}`;
+    
+      return res.status(200).json(new ApiResponse(200, { available: true, url: firmwareUrl }, 'Firmware file available'));
+    } else {
+      return res.status(404).json(new ApiResponse(404, null, 'No firmware file found'));
+    }    
+  });
+};
+
+const deleteBinFile = asyncHandler(async (req, res) => {
+  const uploadDir = path.join(process.cwd(), 'public', 'temp');
+
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      console.error("Failed to read upload directory:", err);
+      return res
+        .status(500)
+        .json(new ApiResponse(500, {}, "Failed to read upload directory"));
+    }
+
+    // Filter and delete previous .bin files
+    files
+      .filter((f) => f.endsWith('.bin')) // Delete all .bin files
+      .forEach((f) => {
+        fs.unlink(path.join(uploadDir, f), (err) => {
+          if (err) {
+            console.error(`Failed to delete file ${f}:`, err);
+          }
+        });
+      });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Bin files deleted successfully"));
+  });
+});
 
 
 export {
@@ -261,5 +312,7 @@ export {
   getAirDataStats,
   getLastHourAirData,
   saveSensorLocation,
-  uploadBinFile
+  uploadBinFile,
+  getBinFileURL,
+  deleteBinFile
 };
