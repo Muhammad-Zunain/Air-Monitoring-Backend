@@ -13,6 +13,7 @@ import fs from "fs";
 const getAllAirData = asyncHandler(async (req, res) => {
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    console.log("kp")
 
     const airData = await AirData.find({
       timestamp: { $gte: new Date('2024-12-31T00:00:00.000Z') }
@@ -66,55 +67,57 @@ const addAirData = asyncHandler(async (req, res) => {
 // @access  Public
 const getMonthlyAverages = asyncHandler(async (req, res) => {
   const { year, type } = req.query;
+  console.log(year, type)
   if (!year || !type) {
-    return res.status(400).json({ error: "Year and type are required." });
+    return res.status(400).json(new ApiResponse(400, null, "Year and type are required"));
   }
 
   const start = new Date(`${year}-01-01T00:00:00Z`);
   const end = new Date(`${parseInt(year) + 1}-01-01T00:00:00Z`);
-  console.log("Start:", start);
-  const entries = await AirData.find({
-    timestamp: { $gte: start, $lt: end },
-  }).limit(530000)
-  .setOptions({ allowDiskUse: true }); 
-  console.log("Entries:", entries.length);
-  const monthlySums = Array(12).fill(0);
-  const monthlyCounts = Array(12).fill(0);
 
-  entries.forEach((entry) => {
-    const date = new Date(entry.timestamp);
-    const monthIndex = date.getMonth();
-    const value = parseFloat(entry[type]);
-    if (!isNaN(value)) {
-      monthlySums[monthIndex] += value;
-      monthlyCounts[monthIndex]++;
-    }
-  });
+  const monthlyAverages = await AirData.aggregate([
+    {
+      $match: {
+        timestamp: { $gte: start, $lt: end },
+        [type]: { $exists: true, $ne: null }
+      }
+    },
+    {
+      $project: {
+        month: { $month: "$timestamp" },
+        [type]: 1
+      }
+    },
+    {
+      $group: {
+        _id: "$month",
+        sum: { $sum: `$${type}` },
+        count: { $sum: 1 }
+      }
+    },
+    {
+      $project: {
+        month: {
+          $arrayElemAt: [
+            ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+            { $subtract: ["$_id", 1] }
+          ]
+        },
+        average: { $cond: [{ $gt: ["$count", 0] }, { $divide: ["$sum", "$count"] }, 0] }
+      }
+    },
+    { $sort: { _id: 1 } }
+  ]);
 
-  const allMonths = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  const result = monthlyAverages.map(item => ({
+    month: item.month,
+    [type]: parseFloat(item.average.toFixed(2))
+  }));
 
-  const monthlyAverages = monthlySums.map((sum, index) => {
-    const avg = monthlyCounts[index] > 0
-      ? parseFloat((sum / monthlyCounts[index]).toFixed(2))
-      : 0;
-    return {
-      month: allMonths[index],
-      [type]: avg
-    };
-  });
-  console.log(monthlyAverages);
-  res.status(201).json(
-    new ApiResponse(
-      201,
-      { monthlyAverages },
-      "Monthly averages fetched successfully"
-    )
+  res.status(200).json(
+    new ApiResponse(200, { monthlyAverages: result }, "Monthly averages fetched successfully")
   );
 });
-
 
 // @desc    Get air data stats
 // @route   GET /api/air-monitoring/get-stat-data
@@ -242,8 +245,6 @@ const saveSensorLocation = asyncHandler(async (req, res) => {
       new ApiResponse(201, sensorLocation, "Sensor location added successfully")
     );
 });
-
-
 
 const uploadBinFile = (req, res) => {
   const { file } = req;
