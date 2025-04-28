@@ -6,36 +6,36 @@ import { console } from "inspector";
 import path from "path";
 import fs from "fs";
 
-
 // @desc    Get all air monitoring data
 // @route   GET /api/air-monitoring/get-air-data
 // @access  Public
 const getAllAirData = asyncHandler(async (req, res) => {
-    const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    console.log("kp")
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Karachi" }));
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    const airData = await AirData.find({
-      timestamp: { $gte: new Date('2024-12-31T00:00:00.000Z') }
-    })
-      .sort({ timestamp: -1 })
-      .limit(1000)
-      .setOptions({ allowDiskUse: true }); 
+  const airData = await AirData.find({
+    timestamp: { $gte: twentyFourHoursAgo },
+  })
+    .sort({ timestamp: -1 })
+    .limit(1000)
+    .setOptions({ allowDiskUse: true });
 
-    if (!airData || airData.length === 0) {
-      
+  if (!airData || airData.length === 0) {
     console.log("No data found");
-      return res
-        .status(404)
-        .json(new ApiResponse(404, null, "No data found for the last 24 hours"));
-    }
-
     return res
-      .status(200)
-      .json(
-        new ApiResponse(200, airData, "Air Monitoring data from last 24 hours fetched successfully")
-      );
-  
+      .status(404)
+      .json(new ApiResponse(404, null, "No data found for the last 24 hours"));
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        airData,
+        "Air Monitoring data from last 24 hours fetched successfully"
+      )
+    );
 });
 
 // @desc    Add air monitoring data
@@ -67,9 +67,11 @@ const addAirData = asyncHandler(async (req, res) => {
 // @access  Public
 const getMonthlyAverages = asyncHandler(async (req, res) => {
   const { year, type } = req.query;
-  console.log(year, type)
+  console.log(year, type);
   if (!year || !type) {
-    return res.status(400).json(new ApiResponse(400, null, "Year and type are required"));
+    return res
+      .status(400)
+      .json(new ApiResponse(400, null, "Year and type are required"));
   }
 
   const start = new Date(`${year}-01-01T00:00:00Z`);
@@ -79,44 +81,65 @@ const getMonthlyAverages = asyncHandler(async (req, res) => {
     {
       $match: {
         timestamp: { $gte: start, $lt: end },
-        [type]: { $exists: true, $ne: null }
-      }
+        [type]: { $exists: true, $ne: null },
+      },
     },
     {
       $project: {
         month: { $month: "$timestamp" },
-        [type]: 1
-      }
+        [type]: 1,
+      },
     },
     {
       $group: {
         _id: "$month",
         sum: { $sum: `$${type}` },
-        count: { $sum: 1 }
-      }
+        count: { $sum: 1 },
+      },
     },
     {
       $project: {
         month: {
           $arrayElemAt: [
-            ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
-            { $subtract: ["$_id", 1] }
-          ]
+            [
+              "January",
+              "February",
+              "March",
+              "April",
+              "May",
+              "June",
+              "July",
+              "August",
+              "September",
+              "October",
+              "November",
+              "December",
+            ],
+            { $subtract: ["$_id", 1] },
+          ],
         },
-        average: { $cond: [{ $gt: ["$count", 0] }, { $divide: ["$sum", "$count"] }, 0] }
-      }
+        average: {
+          $cond: [{ $gt: ["$count", 0] }, { $divide: ["$sum", "$count"] }, 0],
+        },
+      },
     },
-    { $sort: { _id: 1 } }
+    { $sort: { _id: 1 } },
   ]);
 
-  const result = monthlyAverages.map(item => ({
+  const result = monthlyAverages.map((item) => ({
     month: item.month,
-    [type]: parseFloat(item.average.toFixed(2))
+    [type]: parseFloat(item.average.toFixed(2)),
   }));
 
-  res.status(200).json(
-    new ApiResponse(200, { monthlyAverages: result }, "Monthly averages fetched successfully")
-  );
+  res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { monthlyAverages: result },
+        "Monthly averages fetched successfully"
+      )
+    );
 });
 
 // @desc    Get air data stats
@@ -125,7 +148,7 @@ const getMonthlyAverages = asyncHandler(async (req, res) => {
 const getAirDataStats = asyncHandler(async (req, res) => {
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const airData = await AirData.find({
-    timestamp: { $gte: new Date('2024-12-31T00:00:00.000Z') }
+    timestamp: { $gte: new Date("2024-12-31T00:00:00.000Z") },
   })
     .sort({ timestamp: -1 })
     .limit(1000)
@@ -188,28 +211,76 @@ const getAirDataStats = asyncHandler(async (req, res) => {
   );
 });
 
-const getLastHourAirData = asyncHandler(async (req, res) => {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-
+const getHalfHourlyAverages = asyncHandler(async (req, res) => {
   try {
+    let now = new Date();
+    now = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Karachi' }));
+
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
     const airData = await AirData.find({
-      timestamp: { $gte: oneHourAgo }
-    })
-      .sort({ timestamp: -1 })
-      .limit(1000);
+      timestamp: { $gte: twentyFourHoursAgo },
+    }).sort({ timestamp: 1 });
 
     if (airData.length === 0) {
-      return res.status(404).json(new ApiResponse(404, {}, "No data found in the last hour"));
+      return res
+        .status(202)
+        .json(new ApiResponse(202, {}, "No data found in the last 24 hours"));
     }
 
-    res.status(200).json(
-      new ApiResponse(200, airData, "Air data from the last hour")
+    const halfHourlyAverages = [];
+    const halfHourInMs = 30 * 60 * 1000;
+
+    const minutes = now.getMinutes();
+    const halfHourOffset = minutes % 30;
+    const startTime = new Date(
+      now.getTime() - (24 * 60 * 60 * 1000) - (halfHourOffset * 60 * 1000)
     );
+    startTime.setSeconds(0, 0); 
+
+    for (let i = 0; i < 48; i++) {
+      const intervalStart = new Date(startTime.getTime() + (i * halfHourInMs));
+      const intervalEnd = new Date(intervalStart.getTime() + halfHourInMs);
+
+      const intervalData = airData.filter(
+        data => data.timestamp >= intervalStart && data.timestamp < intervalEnd
+      );
+
+      const timeString = `${intervalStart.getHours().toString().padStart(2, '0')}:${
+        intervalStart.getMinutes().toString().padStart(2, '0')
+      }`;
+
+      if (intervalData.length > 0) {
+        const sumTemperature = intervalData.reduce((sum, data) => sum + (data.temperature || 0), 0);
+        const sumHumidity = intervalData.reduce((sum, data) => sum + (data.humidity || 0), 0);
+        const sumDust = intervalData.reduce((sum, data) => sum + (data.dust || 0), 0);
+
+        halfHourlyAverages.push({
+          timeRange: timeString,
+          temperature: parseFloat((sumTemperature / intervalData.length).toFixed(2)),
+          humidity: parseFloat((sumHumidity / intervalData.length).toFixed(2)),
+          dust: parseFloat((sumDust / intervalData.length).toFixed(2))
+        });
+      } else {
+        halfHourlyAverages.push({
+          timeRange: timeString,
+          temperature: null,
+          humidity: null,
+          dust: null
+        });
+      }
+    }
+
+    res
+      .status(201)
+      .json(new ApiResponse(201, 
+        halfHourlyAverages, "Half-hourly temperature, humidity, and dust averages for the last 24 hours"));
   } catch (error) {
-    console.error("Error fetching last hour data:", error);
+    console.error("Error calculating half-hourly averages:", error);
     res.status(500).json(new ApiResponse(500, {}, "Server Error"));
   }
 });
+
 
 const saveSensorLocation = asyncHandler(async (req, res) => {
   const { country, city, regionName, lon, lat } = req.body;
@@ -225,7 +296,7 @@ const saveSensorLocation = asyncHandler(async (req, res) => {
     city,
     regionName,
     lon,
-    lat
+    lat,
   };
 
   const sensorLocation = await SensorLocation(sensorLocationData);
@@ -246,39 +317,68 @@ const saveSensorLocation = asyncHandler(async (req, res) => {
     );
 });
 
+const sendMicroControllerLocation = asyncHandler(async (req, res) => {
+  const locations = await SensorLocation.find();
+
+  console.log(locations)
+
+  if (!locations) {
+    return res
+      .status(202)
+      .json(new ApiResponse(202, null, "No Location Find to MicroController"));
+  }
+
+  return res.status(201).json(new ApiResponse (201, locations,
+    "Locations fetched successfully"));
+});
+
 const uploadBinFile = (req, res) => {
   const { file } = req;
 
   if (!file) {
-    return res.status(400).json(new ApiResponse(400, null, 'No file uploaded'));
+    return res.status(400).json(new ApiResponse(400, null, "No file uploaded"));
   }
 
-  return res.status(201).json(new ApiResponse(201, {}, 'File uploaded successfully'));
+  return res
+    .status(201)
+    .json(new ApiResponse(201, {}, "File uploaded successfully"));
 };
 
 const getBinFileURL = (req, res) => {
-  const uploadDir = path.join(process.cwd(), 'public', 'temp');
+  const uploadDir = path.join(process.cwd(), "public", "temp");
 
   fs.readdir(uploadDir, (err, files) => {
     if (err) {
-      return res.status(500).json({ message: 'Failed to read upload directory' });
+      return res
+        .status(500)
+        .json({ message: "Failed to read upload directory" });
     }
-    
-    const firmwareFile = files.filter((f) => f.endsWith('.bin'))[0];
+
+    const firmwareFile = files.filter((f) => f.endsWith(".bin"))[0];
 
     if (firmwareFile) {
       const encodedFilename = encodeURIComponent(firmwareFile);
-      const firmwareUrl = `${req.protocol}://${req.get('host')}/temp/${encodedFilename}`;
-    
-      return res.status(200).json(new ApiResponse(200, { available: true, url: firmwareUrl }, 'Firmware file available'));
+      const firmwareUrl = `${req.protocol}://${req.get("host")}/temp/${encodedFilename}`;
+
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(
+            200,
+            { available: true, url: firmwareUrl },
+            "Firmware file available"
+          )
+        );
     } else {
-      return res.status(404).json(new ApiResponse(404, null, 'No firmware file found'));
-    }    
+      return res
+        .status(404)
+        .json(new ApiResponse(404, null, "No firmware file found"));
+    }
   });
 };
 
 const deleteBinFile = asyncHandler(async (req, res) => {
-  const uploadDir = path.join(process.cwd(), 'public', 'temp');
+  const uploadDir = path.join(process.cwd(), "public", "temp");
 
   fs.readdir(uploadDir, (err, files) => {
     if (err) {
@@ -290,7 +390,7 @@ const deleteBinFile = asyncHandler(async (req, res) => {
 
     // Filter and delete previous .bin files
     files
-      .filter((f) => f.endsWith('.bin')) // Delete all .bin files
+      .filter((f) => f.endsWith(".bin")) // Delete all .bin files
       .forEach((f) => {
         fs.unlink(path.join(uploadDir, f), (err) => {
           if (err) {
@@ -305,15 +405,15 @@ const deleteBinFile = asyncHandler(async (req, res) => {
   });
 });
 
-
 export {
   getAllAirData,
   addAirData,
   getMonthlyAverages,
   getAirDataStats,
-  getLastHourAirData,
+  getHalfHourlyAverages,
   saveSensorLocation,
   uploadBinFile,
   getBinFileURL,
-  deleteBinFile
+  deleteBinFile,
+  sendMicroControllerLocation,
 };
