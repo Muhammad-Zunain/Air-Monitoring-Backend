@@ -4,7 +4,7 @@ import fs from 'fs';
 
 // Middleware to delete previous .bin files in the temp folder
 const deletePreviousBinFiles = (req, res, next) => {
-  const uploadDir = path.join(process.cwd(), 'tmp');
+  const uploadDir = '/tmp';
 
   fs.readdir(uploadDir, (err, files) => {
     if (err) {
