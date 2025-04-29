@@ -4,7 +4,7 @@ import fs from 'fs';
 
 // Middleware to delete previous .bin files in the temp folder
 const deletePreviousBinFiles = (req, res, next) => {
-  const uploadDir = path.join(process.cwd(), 'public', 'temp');
+  const uploadDir = path.join(process.cwd(), 'tmp');
 
   fs.readdir(uploadDir, (err, files) => {
     if (err) {
@@ -30,7 +30,7 @@ const deletePreviousBinFiles = (req, res, next) => {
 // Multer storage configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(process.cwd(), 'public', 'temp'));  // Temp folder
+    cb(null, '/tmp');  // Temp folder
   },
   filename: (req, file, cb) => {
     cb(null, file.originalname);  // Use the original filename
