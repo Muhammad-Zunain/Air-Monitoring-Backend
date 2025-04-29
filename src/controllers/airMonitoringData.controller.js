@@ -345,7 +345,8 @@ const uploadBinFile = (req, res) => {
 };
 
 const getBinFileURL = (req, res) => {
-  const uploadDir = path.join(process.cwd(), "public", "temp");
+  // const uploadDir = path.join(process.cwd(), "public", "temp");
+  const uploadDir = '/tmp';
 
   fs.readdir(uploadDir, (err, files) => {
     if (err) {
@@ -378,7 +379,8 @@ const getBinFileURL = (req, res) => {
 };
 
 const deleteBinFile = asyncHandler(async (req, res) => {
-  const uploadDir = path.join(process.cwd(), "public", "temp");
+  // const uploadDir = path.join(process.cwd(), "public", "temp");
+  const uploadDir = '/tmp;
 
   fs.readdir(uploadDir, (err, files) => {
     if (err) {
