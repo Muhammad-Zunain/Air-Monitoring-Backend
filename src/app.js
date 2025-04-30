@@ -18,6 +18,10 @@ app.use(express.urlencoded({
 }))
 app.use(express.static("public"))
 
+app.get('/', (req, res) => {
+    res.send("Welcome to Air Monitoring API")
+})
+
 //Routes
 import airMonitoringRouter from './routes/airMonitoring.route.js'
 
