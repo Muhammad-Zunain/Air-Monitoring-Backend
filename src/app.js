@@ -17,8 +17,8 @@ app.use(express.urlencoded({
 }))
 app.use(express.static("public"))
 
-app.get('/', (req, res) => {
-    res.send("Welcome to Air Monitoring API")
+app.get('/', async (req, res)=>{
+    res.json("HELLO")
 })
 
 //Routes
@@ -26,4 +26,4 @@ import airMonitoringRouter from './routes/airMonitoring.route.js'
 
 app.use('/api/air-monitoring', airMonitoringRouter);
 
-export default app;
+export { app };
