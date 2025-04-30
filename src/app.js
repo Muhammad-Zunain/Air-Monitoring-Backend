@@ -26,4 +26,4 @@ import airMonitoringRouter from './routes/airMonitoring.route.js'
 
 app.use('/api/air-monitoring', airMonitoringRouter);
 
-export { app };
+export default app;
